@@ -31,8 +31,13 @@ int main()
 
 	while (1) {
 
-    		valread = read(client_fd, buffer, 1024 - 1); 
-    		printf("%s\n", buffer);
+    		valread = read(client_fd, buffer, 1024 - 1);
+		
+		if (valread == 0) {
+			printf("\nServer closed\n");
+			break;
+		} 
+    		printf("%s\n", buffer);	
 	}
 
    	 close(client_fd);
