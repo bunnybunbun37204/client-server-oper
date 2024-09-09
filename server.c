@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <pthread.h>
+#include <signal.h>
 #define PORT 8080
 
 // Function to send date data
@@ -34,6 +35,10 @@ void* sendDateData(void* socket_desc) {
 }
 
 int main() {
+	
+	// ใส่แล้ว server จะไม่ crash 	
+	signal(SIGPIPE, SIG_IGN);
+
     	int server_fd, new_socket;
     	struct sockaddr_in address;
     	int opt = 1;
