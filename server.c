@@ -8,23 +8,29 @@
 #include <pthread.h>
 #define PORT 8080
 
-// ฟังก์ขันส่ง Data
+// Function to send date data
 void* sendDateData(void* socket_desc) {
 	int new_socket = *(int*)socket_desc;
-   	time_t current_time;
-   	char* time_string;
+    	time_t current_time;
+    	char* time_string;
+
+    	free(socket_desc); // Free the allocated memory for socket descriptor
 
     	while (1) {
         	current_time = time(NULL);
-        	time_string = ctime(&current_time);	
-        	send(new_socket, time_string, strlen(time_string), 0);
- 
+        	time_string = ctime(&current_time);
+
+        	// Check if sending data was successful
+        	if (send(new_socket, time_string, strlen(time_string), 0) <= 0) {
+            		perror("send failed");
+            		break; // Exit loop if sending fails
+        	}
+
         	sleep(1); // delay 1 sec
-    	}
+    }
 
     	close(new_socket);
-    	free(socket_desc); 
-    	return 0;
+    	return NULL;
 }
 
 int main() {
@@ -33,7 +39,7 @@ int main() {
     	int opt = 1;
     	socklen_t addrlen = sizeof(address);
 
-	// Create Socket
+    	// Create Socket
     	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         	perror("socket failed");
         	exit(EXIT_FAILURE);
@@ -48,7 +54,7 @@ int main() {
     	address.sin_addr.s_addr = INADDR_ANY;
     	address.sin_port = htons(PORT);
 
-	// Bind Port
+    // Bind Port
     	if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
         	perror("bind failed");
         	exit(EXIT_FAILURE);
@@ -59,30 +65,34 @@ int main() {
         	exit(EXIT_FAILURE);
     	}
 
-   	printf("Server listening on port %d\n", PORT);
+    	printf("Server listening on port %d\n", PORT);
 
     	while (1) {
-
-        	new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen);
-
-        	if (new_socket < 0) {
+        	if ((new_socket = accept(server_fd, (struct sockaddr*)&address, &addrlen)) < 0) {
             		perror("accept");
-            		exit(EXIT_FAILURE);
+            		continue; // Skip to the next iteration if accept fails
         	}
 
         	printf("New client connected\n");
 
         	int* new_sock = malloc(sizeof(int));
+        	if (new_sock == NULL) {
+            		perror("malloc failed");
+            		close(new_socket);
+            		continue; // Skip to the next iteration if malloc fails
+        	}
+
         	*new_sock = new_socket;
 
         	pthread_t client_thread;
-
-        	if (pthread_create(&client_thread, NULL, sendDateData, (void*)new_sock) < 0) {
+        	if (pthread_create(&client_thread, NULL, sendDateData, (void*)new_sock) != 0) {
             		perror("could not create thread");
-            		exit(EXIT_FAILURE);
+            		free(new_sock); // Free memory if thread creation fails
+            		close(new_socket);
+            		continue; // Skip to the next iteration if thread creation fails
         	}
 
-        	pthread_detach(client_thread);
+        	pthread_detach(client_thread); // Detach thread to avoid hanging
     	}
 
     	close(server_fd);
